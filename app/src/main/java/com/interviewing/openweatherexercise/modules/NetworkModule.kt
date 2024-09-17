@@ -4,6 +4,7 @@ import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
 import dagger.hilt.components.SingletonComponent
+import okhttp3.Interceptor
 import okhttp3.OkHttpClient
 import okhttp3.logging.HttpLoggingInterceptor
 import timber.log.Timber
@@ -17,6 +18,16 @@ import timber.log.Timber
 @InstallIn(SingletonComponent::class)
 class NetworkModule {
 
+    private fun apiKeyInterceptor() = Interceptor { chain ->
+        val original = chain.request()
+        chain.proceed(
+            original.newBuilder().url(
+                original.url.newBuilder()
+                    .addQueryParameter("appid", "4577ed43ce33d6db3df4a9dc21a00a31").build()
+            ).build()
+        )
+    }
+
     @Provides
     fun loggingOkHttpClient() =
         OkHttpClient.Builder()
@@ -27,6 +38,7 @@ class NetworkModule {
                             HttpLoggingInterceptor.Level.BODY
                         )
                     })
+            .addInterceptor(apiKeyInterceptor())
             .build()
 
 }
