@@ -17,7 +17,7 @@ class NetworkingWeatherService(private val weatherServiceEndpoint: WeatherServic
     override suspend fun weatherForLatLon(lat: Double, lon: Double): Forecast? {
         return withContext(Dispatchers.IO) {
             Timber.i("Requesting weather for $lat, $lon")
-            with(weatherServiceEndpoint.weatherForLocation(lat, lon, "<snipped>").execute()) {
+            with(weatherServiceEndpoint.weatherForLocation(lat, lon, "4577ed43ce33d6db3df4a9dc21a00a31").execute()) {
                 if (isSuccessful) {
                     body()
                 } else {

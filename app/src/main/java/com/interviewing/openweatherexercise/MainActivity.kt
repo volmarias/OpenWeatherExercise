@@ -22,6 +22,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.interviewing.openweatherexercise.common.model.Forecast
 import com.interviewing.openweatherexercise.service.WeatherService
+import com.interviewing.openweatherexercise.ui.ForecastDetails
 import com.interviewing.openweatherexercise.ui.theme.OpenWeatherExerciseTheme
 import dagger.hilt.android.AndroidEntryPoint
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -48,11 +49,7 @@ class MainActivity : ComponentActivity() {
                         Column {
                             Text("Current state: ${viewModel.state}")
                             if (viewModel.state == MainWeatherViewModel.LoadingState.LOADED) {
-                                val forecast = viewModel.forecast.value
-                                // TODO: Remove nullity check
-                                if (forecast != null) {
-                                    Text(forecast.toString())
-                                }
+                                ForecastDetails(viewModel.forecast.value!!)
                             }
                         }
                     }
