@@ -28,7 +28,7 @@ class RetrofitModule {
     @Geocoding
     fun getGeocodingRetrofit(gson: Gson, client: OkHttpClient): Retrofit {
         return Retrofit.Builder()
-            .baseUrl("http://api.openweathermap.org/geo/1.0/")
+            .baseUrl("https://api.openweathermap.org/geo/1.0/")
             .client(client)
             .addConverterFactory(GsonConverterFactory.create(gson))
             .build()

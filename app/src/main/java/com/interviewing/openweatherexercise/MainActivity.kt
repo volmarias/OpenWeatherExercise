@@ -21,6 +21,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.interviewing.openweatherexercise.common.model.Forecast
+import com.interviewing.openweatherexercise.service.GeocodingService
 import com.interviewing.openweatherexercise.service.WeatherService
 import com.interviewing.openweatherexercise.ui.ForecastDetails
 import com.interviewing.openweatherexercise.ui.theme.OpenWeatherExerciseTheme
@@ -44,7 +45,7 @@ class MainActivity : ComponentActivity() {
                     Box(modifier = Modifier.padding(innerPadding)) {
                         val viewModel: MainWeatherViewModel = hiltViewModel()
                         LaunchedEffect(key1 = Unit) {
-                            viewModel.fetchForecast(40.72250427983209, -74.0422344687394)
+                            viewModel.fetchForecast("Jersey City,NJ,US")
                         }
                         Column {
                             Text("Current state: ${viewModel.state}")
@@ -58,13 +59,14 @@ class MainActivity : ComponentActivity() {
         }
 
 
-
-
     }
 }
 
 @HiltViewModel
-class MainWeatherViewModel @Inject constructor(private val _weatherService: WeatherService) : ViewModel() {
+class MainWeatherViewModel @Inject constructor(
+    private val _weatherService: WeatherService,
+    private val geocodingService: GeocodingService
+) : ViewModel() {
 
     // TODO: Sealed class
     enum class LoadingState {
@@ -79,9 +81,27 @@ class MainWeatherViewModel @Inject constructor(private val _weatherService: Weat
 
     var state by mutableStateOf(LoadingState.LOADING)
 
+    fun fetchForecast(name: String) {
+        viewModelScope.launch {
+            try {
+                withContext(Dispatchers.Main) { state = LoadingState.LOADING }
+                with (geocodingService.fetchCoordsForName(name)) {
+                    _forecast.value = _weatherService.weatherForLatLon(latitude, longitude)
+                }
+                withContext(Dispatchers.Main) {
+                    state = forecast.value?.run { LoadingState.LOADED } ?: LoadingState.EMPTY
+                }
+            } catch (e: Exception) {
+                Timber.e(e, "Unable to fetch weather")
+                state = LoadingState.ERROR
+            }
+        }
+    }
+
     fun fetchForecast(lat: Double, lon: Double) {
         viewModelScope.launch {
             try {
+                withContext(Dispatchers.Main) { state = LoadingState.LOADING }
                 _forecast.value = _weatherService.weatherForLatLon(lat, lon)
                 withContext(Dispatchers.Main) {
                     state = forecast.value?.run { LoadingState.LOADED } ?: LoadingState.EMPTY

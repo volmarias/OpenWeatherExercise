@@ -18,6 +18,7 @@ import java.time.ZoneOffset
 fun ForecastDetails(forecast: Forecast, modifier: Modifier = Modifier) {
     Column(modifier = modifier) {
         with(forecast) {
+            // TODO: Don't use name here, it's not correct.
             Text(name) // TODO: Should probably live in search bar.
             LazyRow {
                 items(weather) {

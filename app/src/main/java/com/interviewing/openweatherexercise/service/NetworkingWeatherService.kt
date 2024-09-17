@@ -21,7 +21,7 @@ class NetworkingWeatherService(private val weatherServiceEndpoint: WeatherServic
                 if (isSuccessful) {
                     body()
                 } else {
-                    throw IOException("Failed to fetch forecast for $lat, $lon")
+                    throw IOException("Failed to fetch forecast for $lat, $lon" + (errorBody() ?: ""))
                 }
             }
         }
