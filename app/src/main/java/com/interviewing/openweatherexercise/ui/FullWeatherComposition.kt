@@ -12,7 +12,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.tooling.preview.Preview
 import com.interviewing.openweatherexercise.common.model.Forecast
 import java.time.Instant
-import java.time.ZoneOffset
+import java.time.ZoneId
 
 @Composable
 fun ForecastDetails(forecast: Forecast, modifier: Modifier = Modifier) {
@@ -55,7 +55,7 @@ fun Double.kToCString(): String = String.format("%.2f", this - 273.15)
 
 // Going to just assume no incorrect date issues for now.
 fun epochToLocalTime(epoch: Long) =
-    Instant.ofEpochMilli(epoch).atOffset(ZoneOffset.UTC).toLocalTime().withNano(0).withSecond(0)
+    Instant.ofEpochSecond(epoch).atZone(ZoneId.systemDefault()).toLocalTime().withNano(0).withSecond(0)
 
 @Preview
 @Composable
