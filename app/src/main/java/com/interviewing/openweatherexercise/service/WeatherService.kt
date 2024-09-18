@@ -7,5 +7,5 @@ interface WeatherService {
     // Potentially added in future
     //    suspend fun weatherForName(name: String): Forecast
 
-    suspend fun weatherForLatLon(lat: Double, lon: Double): Forecast?
+    suspend fun weatherForLatLon(lat: Double, lon: Double): Forecast
 }

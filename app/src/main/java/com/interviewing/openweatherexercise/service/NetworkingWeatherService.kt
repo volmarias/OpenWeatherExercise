@@ -14,15 +14,15 @@ class NetworkingWeatherService(private val weatherServiceEndpoint: WeatherServic
     WeatherService {
 
 
-    override suspend fun weatherForLatLon(lat: Double, lon: Double): Forecast? {
+    override suspend fun weatherForLatLon(lat: Double, lon: Double): Forecast {
         return withContext(Dispatchers.IO) {
             Timber.i("Requesting weather for $lat, $lon")
-            with(weatherServiceEndpoint.weatherForLocation(lat, lon).execute()) {
-                if (isSuccessful) {
-                    body()
-                } else {
+            with(weatherServiceEndpoint.weatherForLocation(lat, lon, "metric").execute()) {
+                val body = body()
+                if (!isSuccessful || body == null) {
                     throw IOException("Failed to fetch forecast for $lat, $lon" + (errorBody() ?: ""))
                 }
+                body
             }
         }
     }

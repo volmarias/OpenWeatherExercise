@@ -13,6 +13,7 @@ import androidx.compose.ui.tooling.preview.Preview
 import com.interviewing.openweatherexercise.common.model.Forecast
 import java.time.Instant
 import java.time.ZoneId
+import kotlin.math.roundToInt
 
 @Composable
 fun ForecastDetails(forecast: Forecast, modifier: Modifier = Modifier) {
@@ -26,7 +27,7 @@ fun ForecastDetails(forecast: Forecast, modifier: Modifier = Modifier) {
                     }
                 }
             }
-            Text("Now: ${main.temp.kToCString()}°, Min: ${forecast.main.tempMin.kToCString()}°, Max: ${main.tempMax.kToCString()}°")
+            Text("Now: ${main.temp.roundToInt()}°, Min: ${forecast.main.tempMin.roundToInt()}°, Max: ${main.tempMax.roundToInt()}°")
             rain?.run {
                 Text("Rain ${precipString(`1h`, `3h`)}")
             }
@@ -48,12 +49,11 @@ fun precipString(`1h`: Double?, `3h`: Double?): String {
     return l.joinToString(separator = ", then")
 }
 
-/** Converts Kelvin to Celsius */
-fun Double.kToCString(): String = String.format("%.1f", this - 273.15)
-
 // Going to just assume no incorrect date issues for now.
+// Also, don't want to futz with datetimeformatter for now either.
 fun epochToLocalTime(epoch: Long) =
-    Instant.ofEpochSecond(epoch).atZone(ZoneId.systemDefault()).toLocalTime().withNano(0).withSecond(0)
+    Instant.ofEpochSecond(epoch).atZone(ZoneId.systemDefault()).toLocalTime().withNano(0)
+        .withSecond(0)
 
 @Preview
 @Composable
