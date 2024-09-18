@@ -18,8 +18,6 @@ import java.time.ZoneId
 fun ForecastDetails(forecast: Forecast, modifier: Modifier = Modifier) {
     Column(modifier = modifier) {
         with(forecast) {
-            // TODO: Don't use name here, it's not correct.
-            Text(name) // TODO: Should probably live in search bar.
             LazyRow {
                 items(weather) {
                     Row {
@@ -51,7 +49,7 @@ fun precipString(`1h`: Double?, `3h`: Double?): String {
 }
 
 /** Converts Kelvin to Celsius */
-fun Double.kToCString(): String = String.format("%.2f", this - 273.15)
+fun Double.kToCString(): String = String.format("%.1f", this - 273.15)
 
 // Going to just assume no incorrect date issues for now.
 fun epochToLocalTime(epoch: Long) =
