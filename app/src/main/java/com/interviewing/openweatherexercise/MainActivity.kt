@@ -6,39 +6,23 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.MoreVert
-import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.Icon
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.SearchBar
-import androidx.compose.material3.SearchBarDefaults
 import androidx.compose.material3.Text
-import androidx.compose.runtime.Composable
 import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.State
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.semantics.isTraversalGroup
-import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.interviewing.openweatherexercise.MainWeatherViewModel.LoadingState
 import com.interviewing.openweatherexercise.common.model.Forecast
 import com.interviewing.openweatherexercise.service.GeocodingService
 import com.interviewing.openweatherexercise.service.GeocodingService.GeocodedLocation
@@ -88,10 +72,12 @@ class MainActivity : ComponentActivity() {
                             .fillMaxSize()
                     ) {
                         Column {
-                            // TODO: Appropriate display states
-                            Text("Current state: ${mainViewModel.state}")
-                            if (mainViewModel.state == MainWeatherViewModel.LoadingState.LOADED) {
-                                mainViewModel.areaForecast.value?.forecast?.let { ForecastDetails(it) }
+                            when (mainViewModel.state) {
+                                LoadingState.START -> {}
+                                LoadingState.LOADING -> Text("Please wait, loading...")
+                                LoadingState.EMPTY -> Text("Could not find a forecast for this area? This should not happen.")
+                                LoadingState.LOADED -> mainViewModel.areaForecast.value?.forecast?.let { ForecastDetails(it) }
+                                LoadingState.ERROR -> Text("Unable to fetch a forecast for this area, please try again later.")
                             }
                         }
                     }
@@ -147,6 +133,7 @@ class MainWeatherViewModel @Inject constructor(
 
     // TODO: Sealed class
     enum class LoadingState {
+        START,
         LOADING,
         EMPTY,
         LOADED,
@@ -156,10 +143,14 @@ class MainWeatherViewModel @Inject constructor(
     private var _areaForecast: MutableState<AreaForecast?> = mutableStateOf(null)
     val areaForecast: State<AreaForecast?> = _areaForecast
 
-    var state by mutableStateOf(LoadingState.LOADING)
+    var state by mutableStateOf(LoadingState.START)
 
+    // TODO: For a real version, we would replace the user-entered string with the result in the
+    // search bar as well.
     fun fetchForecast(name: String) {
-        fetchForecast { geocodingService.fetchCoordsForName(name)[0] }
+        if (name.isNotBlank()) {
+            fetchForecast { geocodingService.fetchCoordsForName(name)[0] }
+        }
     }
 
     fun fetchForecast(area: GeocodedLocation) {
