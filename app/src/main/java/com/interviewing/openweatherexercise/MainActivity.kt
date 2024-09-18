@@ -10,16 +10,12 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.consumeWindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Search
@@ -29,7 +25,7 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SearchBar
 import androidx.compose.material3.SearchBarDefaults
 import androidx.compose.material3.Text
-import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.Composable
 import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.State
 import androidx.compose.runtime.getValue
@@ -48,6 +44,7 @@ import com.interviewing.openweatherexercise.service.GeocodingService
 import com.interviewing.openweatherexercise.service.GeocodingService.GeocodedLocation
 import com.interviewing.openweatherexercise.service.WeatherService
 import com.interviewing.openweatherexercise.ui.ForecastDetails
+import com.interviewing.openweatherexercise.ui.WeatherSearchBar
 import com.interviewing.openweatherexercise.ui.theme.OpenWeatherExerciseTheme
 import dagger.hilt.android.AndroidEntryPoint
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -72,77 +69,29 @@ class MainActivity : ComponentActivity() {
         setContent {
             OpenWeatherExerciseTheme {
                 val mainViewModel: MainWeatherViewModel = hiltViewModel()
+
                 Scaffold(
                     topBar = {
-                        var topbarText by rememberSaveable { mutableStateOf("") }
-                        var topbarExpanded by rememberSaveable { mutableStateOf(false) }
-
-                        Box(Modifier.semantics { isTraversalGroup = true }) {
-                            val searchViewModel: SearchViewModel = hiltViewModel()
-                            LaunchedEffect(key1 = Unit) {
-                                searchViewModel.initQuickSearch()
-                            }
-                            SearchBar(
-                                modifier = Modifier.fillMaxWidth(),
-                                inputField = {
-                                    SearchBarDefaults.InputField(
-                                        query = topbarText,
-                                        onQueryChange = {
-                                            topbarText = it
-                                            searchViewModel.quickSearches.tryEmit(it)
-                                        },
-                                        onSearch = {
-                                            topbarExpanded = false
-                                            mainViewModel.fetchForecast(it)
-                                        },
-                                        expanded = topbarExpanded,
-                                        onExpandedChange = { topbarExpanded = it },
-                                        placeholder = { Text("City name, State") },
-                                        leadingIcon = {
-                                            Icon(
-                                                Icons.Default.Search,
-                                                contentDescription = null
-                                            )
-                                        },
-                                        trailingIcon = {
-                                            Icon(
-                                                Icons.Default.MoreVert,
-                                                contentDescription = null
-                                            )
-                                        },
-                                    )
-                                },
-                                expanded = topbarExpanded,
-                                onExpandedChange = {
-                                    // TODO
-                                }) {
-                                LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                                    items(searchViewModel.searchResponses.value) {
-                                        val fullNameText = listOfNotNull(
-                                            it.name,
-                                            it.state,
-                                            it.country
-                                        ).joinToString()
-
-                                        Row(modifier = Modifier.fillMaxWidth().clickable {
-                                            topbarExpanded = false
-                                            topbarText = fullNameText
-                                            mainViewModel.fetchForecast(it.lat, it.lon)
-                                        }) {
-                                            Text(fullNameText)
-                                        }
-                                    }
-                                }
-                            }
-                        }
+                        val searchViewModel: SearchViewModel = hiltViewModel()
+                        WeatherSearchBar(
+                            forecastViaString = { mainViewModel.fetchForecast(it) },
+                            forecastViaLocation = { mainViewModel.fetchForecast(it) },
+                            searchString = { searchViewModel.quickSearches.tryEmit(it) },
+                            searchResultState = searchViewModel.searchResponses
+                        )
                     }
                 ) { innerPadding ->
 
-                    Box(modifier = Modifier.padding(innerPadding).fillMaxSize()) {
+                    Box(
+                        modifier = Modifier
+                            .padding(innerPadding)
+                            .fillMaxSize()
+                    ) {
                         Column {
+                            // TODO: Appropriate display states
                             Text("Current state: ${mainViewModel.state}")
                             if (mainViewModel.state == MainWeatherViewModel.LoadingState.LOADED) {
-                                ForecastDetails(mainViewModel.forecast.value!!)
+                                mainViewModel.areaForecast.value?.forecast?.let { ForecastDetails(it) }
                             }
                         }
                     }
@@ -166,26 +115,26 @@ class SearchViewModel @Inject constructor(private val geocodingService: Geocodin
 
     val quickSearches: MutableStateFlow<String> = MutableStateFlow("")
 
-    fun initQuickSearch() {
+    init {
         quickSearchJob = viewModelScope.launch {
             quickSearches
                 .debounce(500)
                 .buffer(onBufferOverflow = BufferOverflow.DROP_OLDEST)
                 .distinctUntilChanged()
                 .collect {
-                if (it.isEmpty()) {
-                    withContext(Dispatchers.Main) { _searchResponses.value = listOf() }
-                } else {
-                    try {
-                        val results = geocodingService.fetchCoordsForName(it)
-                        withContext(Dispatchers.Main) {
-                            _searchResponses.value = results
+                    if (it.isEmpty()) {
+                        withContext(Dispatchers.Main) { _searchResponses.value = listOf() }
+                    } else {
+                        try {
+                            val results = geocodingService.fetchCoordsForName(it)
+                            withContext(Dispatchers.Main) {
+                                _searchResponses.value = results
+                            }
+                        } catch (e: Exception) {
+                            Timber.e(e, "unable to perform quick search")
                         }
-                    } catch (e: Exception) {
-                        Timber.e(e, "unable to perform quick search")
                     }
                 }
-            }
         }
     }
 }
@@ -204,36 +153,29 @@ class MainWeatherViewModel @Inject constructor(
         ERROR
     }
 
-    // TODO: Ought to be a tuple of forcast and geoinfo
-    private var _forecast: MutableState<Forecast?> = mutableStateOf(null)
-    val forecast: State<Forecast?> = _forecast
+    private var _areaForecast: MutableState<AreaForecast?> = mutableStateOf(null)
+    val areaForecast: State<AreaForecast?> = _areaForecast
 
     var state by mutableStateOf(LoadingState.LOADING)
 
     fun fetchForecast(name: String) {
-        viewModelScope.launch {
-            try {
-                withContext(Dispatchers.Main) { state = LoadingState.LOADING }
-                with(geocodingService.fetchCoordsForName(name)[0]) {
-                    _forecast.value = _weatherService.weatherForLatLon(lat, lon)
-                }
-                withContext(Dispatchers.Main) {
-                    state = forecast.value?.run { LoadingState.LOADED } ?: LoadingState.EMPTY
-                }
-            } catch (e: Exception) {
-                Timber.e(e, "Unable to fetch weather")
-                state = LoadingState.ERROR
-            }
-        }
+        fetchForecast { geocodingService.fetchCoordsForName(name)[0] }
     }
 
-    fun fetchForecast(lat: Double, lon: Double) {
+    fun fetchForecast(area: GeocodedLocation) {
+        fetchForecast { area }
+    }
+
+    private fun fetchForecast(areaProvider: suspend () -> GeocodedLocation) {
         viewModelScope.launch {
             try {
                 withContext(Dispatchers.Main) { state = LoadingState.LOADING }
-                _forecast.value = _weatherService.weatherForLatLon(lat, lon)
+                with(areaProvider()) {
+                    val forecast = _weatherService.weatherForLatLon(lat, lon)
+                    _areaForecast.value = AreaForecast(this, forecast)
+                }
                 withContext(Dispatchers.Main) {
-                    state = forecast.value?.run { LoadingState.LOADED } ?: LoadingState.EMPTY
+                    state = areaForecast.value?.run { LoadingState.LOADED } ?: LoadingState.EMPTY
                 }
             } catch (e: Exception) {
                 Timber.e(e, "Unable to fetch weather")
@@ -242,3 +184,5 @@ class MainWeatherViewModel @Inject constructor(
         }
     }
 }
+
+data class AreaForecast(val location: GeocodedLocation, val forecast: Forecast)
