@@ -12,7 +12,6 @@ import timber.log.Timber
 
 /**
  * Provides a logging interceptor for debugging
- * TODO: Separate Release and Debug
  */
 @Module
 @InstallIn(SingletonComponent::class)
@@ -28,16 +27,14 @@ class NetworkModule {
         )
     }
 
+
+    // TODO: In a real version, this would live in release / debug targets, rather than just here.
     @Provides
-    fun loggingOkHttpClient() =
+    fun okHttpClient() =
         OkHttpClient.Builder()
             .addInterceptor(
                 HttpLoggingInterceptor { message -> Timber.i(message) }
-                    .also {
-                        it.setLevel(
-                            HttpLoggingInterceptor.Level.BODY
-                        )
-                    })
+                    .also { it.setLevel(HttpLoggingInterceptor.Level.BODY) })
             .addInterceptor(apiKeyInterceptor())
             .build()
 

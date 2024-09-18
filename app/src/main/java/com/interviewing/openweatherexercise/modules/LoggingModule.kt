@@ -10,7 +10,7 @@ import timber.log.Timber.DebugTree
 /**
  * Timber will use normal debug logs
  *
- * TODO: Move this to debug/release, for appropriate targets
+ * TODO: In a real version, this would live in release / debug targets, rather than just here.
  */
 @Module
 @InstallIn(SingletonComponent::class)
