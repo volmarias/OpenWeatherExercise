@@ -98,6 +98,10 @@ dependencies {
     // GMS
     implementation(libs.play.services.location)
 
+    // Coil
+    implementation(libs.coil)
+    implementation(libs.coil.compose)
+
 }
 
 // Allow references to generated code

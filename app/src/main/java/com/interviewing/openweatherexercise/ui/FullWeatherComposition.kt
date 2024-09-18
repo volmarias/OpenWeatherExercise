@@ -1,15 +1,20 @@
 package com.interviewing.openweatherexercise.ui
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.gestures.Orientation
+import androidx.compose.foundation.gestures.rememberScrollableState
+import androidx.compose.foundation.gestures.scrollable
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.lazy.LazyRow
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.tooling.preview.Preview
+import coil.compose.AsyncImage
 import com.interviewing.openweatherexercise.common.model.Forecast
 import java.time.Instant
 import java.time.ZoneId
@@ -19,15 +24,24 @@ import kotlin.math.roundToInt
 fun ForecastDetails(forecast: Forecast, modifier: Modifier = Modifier) {
     Column(modifier = modifier) {
         with(forecast) {
-            LazyRow {
-                items(weather) {
-                    Row {
-                        // TODO: Icon, for now just use desc.
-                        Text(it.description)
-                    }
+
+            LazyRow(Modifier
+                .scrollable(rememberScrollableState { it }, orientation = Orientation.Horizontal, enabled = false)
+                .background(Color.Cyan)
+                .fillMaxWidth()
+            ) {
+                item {
+                    Text(main.temp.roundToInt().toString(), style = MaterialTheme.typography.headlineLarge)
+                }
+                itemsIndexed(weather) { index, it ->
+                    AsyncImage(
+                        model = "https://openweathermap.org/img/wn/${it.icon}@${if (index == 0) "2x" else "1x"}.png",
+                        contentDescription = it.description,
+                        // TODO: Relevant placeholders, etc.
+                    )
                 }
             }
-            Text("Now: ${main.temp.roundToInt()}°, Min: ${forecast.main.tempMin.roundToInt()}°, Max: ${main.tempMax.roundToInt()}°")
+            Text("Min: ${forecast.main.tempMin.roundToInt()}°, Max: ${main.tempMax.roundToInt()}°")
             rain?.run {
                 Text("Rain ${precipString(`1h`, `3h`)}")
             }
@@ -60,14 +74,17 @@ fun epochToLocalTime(epoch: Long) =
 fun WeatherPreview() {
     val forecast = Forecast(
         coord = Forecast.Coord(40.7225, -74.0422),
-        weather = listOf(Forecast.Weather("802", "Clouds", "scattered clouds", "03d")),
+        weather = listOf(
+            Forecast.Weather("802", "Clouds", "scattered clouds", "03d"),
+            Forecast.Weather("804", "Clouds", "overcast clouds", "04d")
+        ),
         main = Forecast.Main(
-            temp = 297.0,
-            feelsLike = 298.0,
+            temp = 22.0,
+            feelsLike = 23.0,
             pressure = 1020.0,
             humidity = 65.0,
-            tempMin = 296.0,
-            tempMax = 299.0,
+            tempMin = 21.0,
+            tempMax = 24.0,
             seaLevel = 1020.0,
             grndLevel = 1019.0
         ),

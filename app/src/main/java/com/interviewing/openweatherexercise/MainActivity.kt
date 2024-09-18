@@ -27,7 +27,6 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.core.app.ActivityCompat
-import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.google.android.gms.location.CurrentLocationRequest
@@ -35,6 +34,7 @@ import com.google.android.gms.location.FusedLocationProviderClient
 import com.google.android.gms.location.Granularity
 import com.google.android.gms.location.LocationServices
 import com.google.android.gms.location.Priority.PRIORITY_HIGH_ACCURACY
+import com.google.gson.Gson
 import com.interviewing.openweatherexercise.MainWeatherViewModel.LoadingState
 import com.interviewing.openweatherexercise.common.model.Forecast
 import com.interviewing.openweatherexercise.service.GeocodingService
@@ -65,13 +65,14 @@ class MainActivity : ComponentActivity() {
     private lateinit var locationPermissionRequest: ActivityResultLauncher<String>
 
     private val mainViewModel: MainWeatherViewModel by viewModels()
+    private val searchViewModel: SearchViewModel by viewModels()
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
 
         locationProvider = LocationServices.getFusedLocationProviderClient(this)
-        locationPermissionRequest = registerForActivityResult (
+        locationPermissionRequest = registerForActivityResult(
             ActivityResultContracts.RequestPermission()
         ) { granted ->
             if (granted) {
@@ -82,14 +83,24 @@ class MainActivity : ComponentActivity() {
             }
         }
 
+        // This is a very hacky way, I'd use an actual data store if I had time. Oh well.
+        val defaultSearchTarget = getSharedPreferences("", 0).getString("default_search_result", null)
+        defaultSearchTarget?.let {
+            val location = Gson().fromJson(it, GeocodedLocation::class.java)
+            mainViewModel.fetchForecast(location)
+            searchViewModel.searchText.value = location.displayString()
+        } ?: {
+            searchViewModel.expanded.value = true
+        }
+
+
         setContent {
             OpenWeatherExerciseTheme {
-                val mainViewModel: MainWeatherViewModel = hiltViewModel()
-
                 Scaffold(
                     topBar = {
-                        val searchViewModel: SearchViewModel = hiltViewModel()
                         WeatherSearchBar(
+                            textProvider = { searchViewModel.searchText },
+                            expandedProvider = { searchViewModel.expanded },
                             forecastViaString = { mainViewModel.fetchForecast(it) },
                             forecastViaResult = { mainViewModel.fetchForecast(it) },
                             searchString = { searchViewModel.quickSearches.tryEmit(it) },
@@ -125,12 +136,27 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    override fun onStop() {
+        super.onStop()
+        val areaforecast = mainViewModel.areaForecast.value
+        // This is a very hacky way, I'd use an actual data store if I had time. Oh well.
+        if (mainViewModel.state == LoadingState.LOADED && areaforecast != null) {
+            getSharedPreferences("", 0)
+                .edit()
+                .putString("default_search_result", Gson().toJson(areaforecast.location))
+                .apply()
+        }
+    }
+
     private fun requestUserLocation() {
         if (ActivityCompat.checkSelfPermission(this, ACCESS_COARSE_LOCATION)
             == PERMISSION_GRANTED
         ) {
             fetchLocationTask(
-                successCallback = { mainViewModel.fetchForecast(it) },
+                successCallback = {
+                    mainViewModel.fetchForecast(it)
+                    searchViewModel.expanded.value = false
+                                  },
                 failureCallback = { mainViewModel.fetchForecastFailure(it) }
             )
         } else {
@@ -165,6 +191,9 @@ class SearchViewModel @Inject constructor(private val geocodingService: Geocodin
     ViewModel() {
     private var _searchResponses: MutableState<List<GeocodedLocation>> = mutableStateOf(listOf())
     val searchResponses: State<List<GeocodedLocation>> = _searchResponses
+
+    val searchText = mutableStateOf("")
+    val expanded = mutableStateOf(false)
 
     private var quickSearchJob: Job? = null
         set(value) {
@@ -231,7 +260,12 @@ class MainWeatherViewModel @Inject constructor(
     }
 
     fun fetchForecast(location: Location) {
-        fetchForecast { geocodingService.fetchNameForCoords(location.latitude, location.longitude)[0] }
+        fetchForecast {
+            geocodingService.fetchNameForCoords(
+                location.latitude,
+                location.longitude
+            )[0]
+        }
     }
 
     fun fetchForecastFailure(e: Exception) {
@@ -256,7 +290,6 @@ class MainWeatherViewModel @Inject constructor(
             }
         }
     }
-
 }
 
 data class AreaForecast(val location: GeocodedLocation, val forecast: Forecast)

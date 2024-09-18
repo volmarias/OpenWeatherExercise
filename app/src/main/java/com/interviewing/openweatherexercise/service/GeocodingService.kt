@@ -23,5 +23,12 @@ interface GeocodingService {
         val name: String,
         val country: String,
         val state: String?
-    )
+    ) {
+        fun displayString(): String =
+            listOfNotNull(
+                name,
+                state,
+                country
+            ).joinToString()
+    }
 }
