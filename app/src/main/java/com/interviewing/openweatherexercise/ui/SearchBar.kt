@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -23,6 +24,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.semantics.isTraversalGroup
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
@@ -31,9 +33,10 @@ import com.interviewing.openweatherexercise.service.GeocodingService.GeocodedLoc
 @Composable
 fun WeatherSearchBar(
     forecastViaString: (String) -> Unit,
-    forecastViaLocation: (GeocodedLocation) -> Unit,
+    forecastViaResult: (GeocodedLocation) -> Unit,
     searchString: (String) -> Unit,
     searchResultState: State<List<GeocodedLocation>>,
+    requestCurrentLocation: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     var topbarText by rememberSaveable { mutableStateOf("") }
@@ -75,6 +78,16 @@ fun WeatherSearchBar(
                 // TODO
             }) {
             LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                item {
+                    Row(modifier = Modifier.fillMaxWidth().clickable {
+                        // TODO
+                        requestCurrentLocation()
+                    }) {
+                        // TODO: There's a builtin for RTL handling, forget which, not important.
+                        Icon(Icons.Default.LocationOn, contentDescription = null, tint = Color.Blue)
+                        Text("Current Location")
+                    }
+                }
                 items(searchResultState.value) {
                     val fullNameText = listOfNotNull(
                         it.name,
@@ -87,7 +100,7 @@ fun WeatherSearchBar(
                         .clickable {
                             topbarExpanded = false
                             topbarText = fullNameText
-                            forecastViaLocation(it)
+                            forecastViaResult(it)
                         }) {
                         Text(fullNameText)
                     }

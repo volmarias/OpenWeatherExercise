@@ -95,6 +95,9 @@ dependencies {
     // Logging
     implementation(libs.timber)
 
+    // GMS
+    implementation(libs.play.services.location)
+
 }
 
 // Allow references to generated code

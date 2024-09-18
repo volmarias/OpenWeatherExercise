@@ -19,7 +19,7 @@ interface GeocodingEndpoint {
 //    fun zipcodeQuery(@Query("zip") zip: String)
 
     @GET("reverse")
-    fun reverseQuery(@Query("lat") lat: Double, @Query("lon") lon: Double, limit: Int = 5): Call<Array<GeocodingResponse>>
+    fun reverseQuery(@Query("lat") lat: Double, @Query("lon") lon: Double, @Query("limit") limit: Int = 5): Call<Array<GeocodingResponse>>
 
     companion object {
         data class GeocodingResponse(

@@ -2,10 +2,17 @@
 
 package com.interviewing.openweatherexercise
 
+import android.Manifest.permission.ACCESS_COARSE_LOCATION
+import android.content.pm.PackageManager.PERMISSION_GRANTED
+import android.location.Location
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.activity.result.ActivityResultLauncher
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.activity.viewModels
+import androidx.annotation.RequiresPermission
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
@@ -19,9 +26,15 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.core.app.ActivityCompat
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.google.android.gms.location.CurrentLocationRequest
+import com.google.android.gms.location.FusedLocationProviderClient
+import com.google.android.gms.location.Granularity
+import com.google.android.gms.location.LocationServices
+import com.google.android.gms.location.Priority.PRIORITY_HIGH_ACCURACY
 import com.interviewing.openweatherexercise.MainWeatherViewModel.LoadingState
 import com.interviewing.openweatherexercise.common.model.Forecast
 import com.interviewing.openweatherexercise.service.GeocodingService
@@ -47,9 +60,28 @@ import javax.inject.Inject
 
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
+
+    private lateinit var locationProvider: FusedLocationProviderClient
+    private lateinit var locationPermissionRequest: ActivityResultLauncher<String>
+
+    private val mainViewModel: MainWeatherViewModel by viewModels()
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
+
+        locationProvider = LocationServices.getFusedLocationProviderClient(this)
+        locationPermissionRequest = registerForActivityResult (
+            ActivityResultContracts.RequestPermission()
+        ) { granted ->
+            if (granted) {
+                requestUserLocation()
+            } else {
+                // Currently, do nothing. The user remains on the search bar.
+                // In a real version, this would probably remove the location option at some point.
+            }
+        }
+
         setContent {
             OpenWeatherExerciseTheme {
                 val mainViewModel: MainWeatherViewModel = hiltViewModel()
@@ -59,9 +91,12 @@ class MainActivity : ComponentActivity() {
                         val searchViewModel: SearchViewModel = hiltViewModel()
                         WeatherSearchBar(
                             forecastViaString = { mainViewModel.fetchForecast(it) },
-                            forecastViaLocation = { mainViewModel.fetchForecast(it) },
+                            forecastViaResult = { mainViewModel.fetchForecast(it) },
                             searchString = { searchViewModel.quickSearches.tryEmit(it) },
-                            searchResultState = searchViewModel.searchResponses
+                            searchResultState = searchViewModel.searchResponses,
+                            requestCurrentLocation = {
+                                requestUserLocation()
+                            }
                         )
                     }
                 ) { innerPadding ->
@@ -76,13 +111,51 @@ class MainActivity : ComponentActivity() {
                                 LoadingState.START -> {}
                                 LoadingState.LOADING -> Text("Please wait, loading...")
                                 LoadingState.EMPTY -> Text("Could not find a forecast for this area? This should not happen.")
-                                LoadingState.LOADED -> mainViewModel.areaForecast.value?.forecast?.let { ForecastDetails(it) }
+                                LoadingState.LOADED ->
+                                    mainViewModel.areaForecast.value?.forecast?.let {
+                                        ForecastDetails(it)
+                                    }
+
                                 LoadingState.ERROR -> Text("Unable to fetch a forecast for this area, please try again later.")
                             }
                         }
                     }
                 }
             }
+        }
+    }
+
+    private fun requestUserLocation() {
+        if (ActivityCompat.checkSelfPermission(this, ACCESS_COARSE_LOCATION)
+            == PERMISSION_GRANTED
+        ) {
+            fetchLocationTask(
+                successCallback = { mainViewModel.fetchForecast(it) },
+                failureCallback = { mainViewModel.fetchForecastFailure(it) }
+            )
+        } else {
+            locationPermissionRequest.launch(ACCESS_COARSE_LOCATION)
+        }
+    }
+
+    @RequiresPermission(ACCESS_COARSE_LOCATION)
+    private fun fetchLocationTask(
+        successCallback: (Location) -> Unit,
+        failureCallback: (Exception) -> Unit
+    ) {
+        // Make the compiler happy.
+        locationProvider.getCurrentLocation(
+            CurrentLocationRequest.Builder()
+                .setPriority(PRIORITY_HIGH_ACCURACY)
+                .setGranularity(Granularity.GRANULARITY_COARSE)
+                .setDurationMillis(5000)
+                .setMaxUpdateAgeMillis(60 * 1000)
+                .build(),
+            null
+        ).addOnSuccessListener(this) {
+            successCallback(it)
+        }.addOnFailureListener(this) {
+            failureCallback(it)
         }
     }
 }
@@ -137,7 +210,7 @@ class MainWeatherViewModel @Inject constructor(
         LOADING,
         EMPTY,
         LOADED,
-        ERROR
+        ERROR,
     }
 
     private var _areaForecast: MutableState<AreaForecast?> = mutableStateOf(null)
@@ -157,23 +230,33 @@ class MainWeatherViewModel @Inject constructor(
         fetchForecast { area }
     }
 
+    fun fetchForecast(location: Location) {
+        fetchForecast { geocodingService.fetchNameForCoords(location.latitude, location.longitude)[0] }
+    }
+
+    fun fetchForecastFailure(e: Exception) {
+        Timber.e(e, "Unable to fetch weather")
+        state = LoadingState.ERROR
+    }
+
     private fun fetchForecast(areaProvider: suspend () -> GeocodedLocation) {
         viewModelScope.launch {
             try {
-                withContext(Dispatchers.Main) { state = LoadingState.LOADING }
-                with(areaProvider()) {
-                    val forecast = _weatherService.weatherForLatLon(lat, lon)
-                    _areaForecast.value = AreaForecast(this, forecast)
+                state = LoadingState.LOADING
+                withContext(Dispatchers.IO) {
+                    val area = areaProvider()
+                    val forecast = _weatherService.weatherForLatLon(area.lat, area.lon)
+                    withContext(Dispatchers.Main) {
+                        _areaForecast.value = AreaForecast(area, forecast)
+                    }
                 }
-                withContext(Dispatchers.Main) {
-                    state = areaForecast.value?.run { LoadingState.LOADED } ?: LoadingState.EMPTY
-                }
+                state = areaForecast.value?.run { LoadingState.LOADED } ?: LoadingState.EMPTY
             } catch (e: Exception) {
-                Timber.e(e, "Unable to fetch weather")
-                state = LoadingState.ERROR
+                fetchForecastFailure(e)
             }
         }
     }
+
 }
 
 data class AreaForecast(val location: GeocodedLocation, val forecast: Forecast)
